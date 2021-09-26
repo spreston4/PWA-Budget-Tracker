@@ -38,8 +38,40 @@ self.addEventListener('activate', function (evt) {
             );
         })
     );
+
+    self.clients.claim();
 });
 
-// Listen for fetches to api
+// Listen for fetches to API
+self.addEventListener('fetch', function (evt) {
+    // Cache successful requests to rhe API
+    if (evt.request.url.includes('/api')) {
+        evt.respondWith(
+            caches.open(DATA_CACHE_NAME).then(cache => {
+                return fetch(evt.request)
+                .then(response => {
+                    // If response is good, clone it and store it in the cache
+                    if (response.status === 200) {
+                        cache.put(evt.request.url, response.clone());
+                    }
 
-// Serve static assets
+                    return response;
+                })
+                .catch(err => {
+                    // If network request failed, try to get it from the cache
+                    return cache.match(evt.request);
+                });
+            }).catch(err => console.log(err))
+        );
+
+        return;
+    }
+
+    // If request not for API, serve static assets
+    evt.respondWith(
+        caches.match(evt.request).then(function (response) {
+            return response || fetch(evt.request);
+        })
+    );
+});
+
